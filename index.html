@@ -233,8 +233,19 @@
       linear-gradient(to right,transparent 0%,#000 10%);
     -webkit-mask-composite:source-in;
     mask-composite:intersect;
-    filter:drop-shadow(0 0 18px rgba(0,0,0,.85));opacity:0;transition:opacity .55s ease;}
+    filter:drop-shadow(0 0 18px rgba(0,0,0,.85));
+    opacity:0;
+    transition:opacity 1.2s cubic-bezier(.2,.7,.2,1);}
   .character-art-img.loaded{opacity:1;}
+  .character-art-wrap.art-loading::after{content:"";position:absolute;width:52px;height:52px;border-radius:50%;z-index:2;
+    border:1px solid rgba(216,182,118,.16);border-top-color:rgba(216,182,118,.9);
+    box-shadow:0 0 20px rgba(216,182,118,.22),inset 0 0 14px rgba(216,182,118,.10);
+    animation:artring 1.15s linear infinite;}
+  @keyframes artring{
+    0%{transform:rotate(0deg);opacity:.5;}
+    50%{opacity:1;}
+    100%{transform:rotate(360deg);opacity:.5;}
+  }
   .character-art-wrap.art-fail .character-art-img{opacity:0;}
   .character-art-wrap.art-fail::after{content:"立绘加载失败 · 请检查 images/ 路径";position:absolute;left:0;right:0;bottom:44%;
     text-align:center;font-size:9px;letter-spacing:.06em;color:#B08A93;z-index:2;}
@@ -1269,14 +1280,30 @@ function renderResult(){
     : top.name;
   $('#resSigilText').textContent = art.sigil;
 
+  /* 立绘：先预加载，加载完成后再赋 src 并淡入，避免 900KB 原图造成黑屏空窗 */
   const artEl = $('#charArt'), artWrap = artEl.parentElement;
+  const token = (artWrap._artToken = (artWrap._artToken || 0) + 1);
   artEl.classList.remove('loaded');
+  artEl.removeAttribute('src');
   artWrap.classList.remove('art-fail');
+  artWrap.classList.add('art-loading');
   artEl.alt = (r.hidden ? HIDDEN[r.hidden].title : top.name) + ' · 神明立绘';
-  artEl.onload = ()=>{ artEl.classList.add('loaded'); artWrap.classList.remove('art-fail'); };
   artEl.onerror = ()=>{ artEl.classList.remove('loaded'); artWrap.classList.add('art-fail'); };
-  artEl.src = art.img;
-  if(artEl.complete && artEl.naturalWidth > 0) artEl.classList.add('loaded');
+  const pre = new Image();
+  pre.onload = ()=>{
+    if(artWrap._artToken !== token) return;
+    artWrap.classList.remove('art-loading');
+    artEl.src = art.img;
+    const show = ()=> artEl.classList.add('loaded');
+    requestAnimationFrame(show);
+    setTimeout(show, 90);
+  };
+  pre.onerror = ()=>{
+    if(artWrap._artToken !== token) return;
+    artWrap.classList.remove('art-loading');
+    artWrap.classList.add('art-fail');
+  };
+  pre.src = art.img;
 
   $('#eggSlot').innerHTML = r.hidden
     ? `<div class="egg"><h4>✦ ${HIDDEN[r.hidden].title}</h4><p>${HIDDEN[r.hidden].desc}</p>
